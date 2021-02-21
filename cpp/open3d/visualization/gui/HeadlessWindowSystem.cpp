@@ -244,6 +244,7 @@ void HeadlessWindowSystem::CancelUserClose(OSWindow w) {}
 void *HeadlessWindowSystem::GetNativeDrawable(OSWindow w) { return nullptr; }
 
 rendering::FilamentRenderer *HeadlessWindowSystem::CreateRenderer(OSWindow w) {
+    rendering::EngineInstance::EnableHeadless();
     auto *renderer = new rendering::FilamentRenderer(
             rendering::EngineInstance::GetInstance(),
             ((HeadlessWindow *)w)->frame.width,

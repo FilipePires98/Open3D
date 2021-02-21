@@ -1012,6 +1012,10 @@ void Window::OnResize() {
 void Window::OnMouseEvent(const MouseEvent& e) {
     MakeDrawContextCurrent();
 
+    if (impl_ != nullptr) {
+        utility::LogInfo("impl_ is not nullptr");
+    }
+
     // We don't have a good way of determining when resizing ends; the most
     // likely action after resizing a window is to move the mouse.
     if (impl_->is_resizing_) {

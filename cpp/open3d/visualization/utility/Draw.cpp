@@ -26,10 +26,14 @@
 
 #include "open3d/visualization/utility/Draw.h"
 
+#include <chrono>
 #include <sstream>
+#include <thread>
 
+#include "open3d/io/ImageIO.h"
 #include "open3d/utility/Console.h"
 #include "open3d/visualization/gui/Application.h"
+#include "open3d/visualization/gui/HeadlessWindowSystem.h"
 
 namespace open3d {
 namespace visualization {
@@ -87,7 +91,19 @@ void Draw(const std::vector<DrawObject> &objects,
           int width /*= 1024*/,
           int height /*= 768*/,
           const std::vector<DrawAction> &actions /*= {}*/) {
-    gui::Application::GetInstance().Initialize();
+    auto &o3d_app = gui::Application::GetInstance();
+    auto headless_window = std::make_shared<gui::HeadlessWindowSystem>();
+    auto draw_callback = [](gui::Window *window,
+                            std::shared_ptr<geometry::Image> im) -> void {
+        static int image_id = 0;
+        utility::LogInfo("draw_callback called, image id {}", image_id);
+        io::WriteImage(fmt::format("headless_{}.jpg", image_id), *im);
+        image_id++;
+    };
+    headless_window->SetOnWindowDraw(draw_callback);
+    o3d_app.SetWindowSystem(headless_window);
+    o3d_app.Initialize();
+
     auto draw = std::make_shared<visualizer::O3DVisualizer>(window_name, width,
                                                             height);
     for (auto &o : objects) {
@@ -107,6 +123,23 @@ void Draw(const std::vector<DrawObject> &objects,
 
     gui::Application::GetInstance().AddWindow(draw);
     draw.reset();  // so we don't hold onto the pointer after Run() cleans up
+
+    auto emulate_mouse_events = [headless_window]() -> void {
+        while (true) {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            utility::LogInfo("emulate_mouse_events called");
+            gui::MouseEvent me;
+
+            utility::LogInfo("Send click");
+            me = gui::MouseEvent{gui::MouseEvent::Type::BUTTON_DOWN, 139, 366,
+                                 0};
+            me.button.button = gui::MouseButton::LEFT;
+            headless_window->PostMouseEvent(headless_window.get(), me);
+            utility::LogInfo("Send click done");
+        }
+    };
+    std::thread thead(emulate_mouse_events);
+
     gui::Application::GetInstance().Run();
 }
 
