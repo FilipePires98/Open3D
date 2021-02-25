@@ -79,20 +79,18 @@ void pybind_image(py::module &m) {
     image.def(py::init([](py::buffer b) {
              py::buffer_info info = b.request();
              int width, height, num_of_channels = 0, bytes_per_channel;
+             uint64_t device_timestamp = 0, system_timestamp = 0; 
              if (info.format == py::format_descriptor<uint8_t>::format() ||
                  info.format == py::format_descriptor<int8_t>::format()) {
                  bytes_per_channel = 1;
-             } else if (info.format ==
-                                py::format_descriptor<uint16_t>::format() ||
-                        info.format ==
-                                py::format_descriptor<int16_t>::format()) {
+             } else if (info.format == py::format_descriptor<uint16_t>::format() || info.format == py::format_descriptor<int16_t>::format()) {
                  bytes_per_channel = 2;
              } else if (info.format == py::format_descriptor<float>::format()) {
                  bytes_per_channel = 4;
              } else {
                  throw std::runtime_error(
-                         "Image can only be initialized from buffer of uint8, "
-                         "uint16, or float!");
+                        "Image can only be initialized from buffer of uint8, "
+                        "uint16, or float!");
              }
              if (info.strides[info.ndim - 1] != bytes_per_channel) {
                  throw std::runtime_error(
@@ -153,16 +151,40 @@ void pybind_image(py::module &m) {
                 }
             })
             .def("__repr__",
-                 [](const Image &img) {
-                     return std::string("Image of size ") +
+                [](const Image &img) {
+                    return std::string("Image of size ") +
                             std::to_string(img.width_) + std::string("x") +
-                            std::to_string(img.height_) + ", with " +
-                            std::to_string(img.num_of_channels_) +
-                            std::string(
-                                    " channels.\nUse numpy.asarray to access "
-                                    "buffer "
-                                    "data.");
+                            std::to_string(img.height_) + std::string(", with ") +
+                            std::to_string(img.num_of_channels_) + std::string(" channels and timestamped with ") + 
+                            std::to_string(img.device_timestamp_usec_) + std::string(" usec (device time) and ") + 
+                            std::to_string(img.system_timestamp_nsec_) + std::string(" nsec (system time). ") + 
+                            std::string("\nUse numpy.asarray to access buffer data.");
                  })
+            .def("getWidth",
+                [](const Image &img) {
+                    return img.width_;
+                },
+                "Function to retrieve Image width")
+            .def("getHeight",
+                [](const Image &img) {
+                    return img.height_;
+                },
+                "Function to retrieve Image height")
+            .def("getNumOfChannels",
+                [](const Image &img) {
+                    return img.num_of_channels_;
+                },
+                "Function to retrieve Image number of channels")
+            .def("getDeviceTimestamp",
+                [](const Image &img) {
+                    return img.device_timestamp_usec_;
+                },
+                "Function to retrieve Image device timestamp (in usec)")
+            .def("getSystemTimestamp",
+                [](const Image &img) {
+                    return img.system_timestamp_nsec_;
+                },
+                "Function to retrieve Image system timestamp (in nsec)")
             .def(
                     "filter",
                     [](const Image &input, Image::FilterType filter_type) {
@@ -233,21 +255,18 @@ void pybind_image(py::module &m) {
                  [](const RGBDImage &rgbd_image) {
                      return std::string("RGBDImage of size \n") +
                             std::string("Color image : ") +
-                            std::to_string(rgbd_image.color_.width_) +
-                            std::string("x") +
-                            std::to_string(rgbd_image.color_.height_) +
-                            ", with " +
-                            std::to_string(rgbd_image.color_.num_of_channels_) +
-                            std::string(" channels.\n") +
+                            std::to_string(rgbd_image.color_.width_) + std::string("x") +
+                            std::to_string(rgbd_image.color_.height_) + std::string(", with ") +
+                            std::to_string(rgbd_image.color_.num_of_channels_) + std::string(" channels and timestamped with ") + 
+                            std::to_string(rgbd_image.color_.device_timestamp_usec_) + std::string(" usec (device time) and ") + 
+                            std::to_string(rgbd_image.color_.system_timestamp_nsec_) + std::string(" nsec (system time).\n") +
                             std::string("Depth image : ") +
-                            std::to_string(rgbd_image.depth_.width_) +
-                            std::string("x") +
-                            std::to_string(rgbd_image.depth_.height_) +
-                            ", with " +
-                            std::to_string(rgbd_image.depth_.num_of_channels_) +
-                            std::string(" channels.\n") +
-                            std::string(
-                                    "Use numpy.asarray to access buffer data.");
+                            std::to_string(rgbd_image.depth_.width_) + std::string("x") +
+                            std::to_string(rgbd_image.depth_.height_) + std::string(", with ") +
+                            std::to_string(rgbd_image.depth_.num_of_channels_) + std::string(" channels and timestamped with ") + 
+                            std::to_string(rgbd_image.depth_.device_timestamp_usec_) + std::string(" usec (device time) and ") + 
+                            std::to_string(rgbd_image.depth_.system_timestamp_nsec_) + std::string(" nsec (system time).\n") +
+                            std::string("Use numpy.asarray to access buffer data.");
                  })
             .def_static("create_from_color_and_depth",
                         &RGBDImage::CreateFromColorAndDepth,

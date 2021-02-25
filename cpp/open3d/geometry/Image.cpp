@@ -45,6 +45,8 @@ Image &Image::Clear() {
     height_ = 0;
     num_of_channels_ = 0;
     bytes_per_channel_ = 0;
+    device_timestamp_usec_ = 0;
+    system_timestamp_nsec_ = 0;
     data_.clear();
     return *this;
 }

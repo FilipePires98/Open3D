@@ -176,7 +176,11 @@ int k4a_image_get_height_pixels(k4a_image_t image_handle);
 
 int k4a_image_get_stride_bytes(k4a_image_t image_handle);
 
-uint64_t k4a_image_get_timestamp_usec(k4a_image_t image_handle);
+// uint64_t k4a_image_get_timestamp_usec(k4a_image_t image_handle);
+
+uint64_t k4a_image_get_device_timestamp_usec(k4a_image_t image_handle);
+
+uint64_t k4a_image_get_system_timestamp_nsec(k4a_image_t image_handle);
 
 uint64_t k4a_image_get_exposure_usec(k4a_image_t image_handle);
 

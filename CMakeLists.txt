@@ -17,8 +17,8 @@ option(BUILD_UNIT_TESTS           "Build Open3D unit tests"                  OFF
 option(BUILD_BENCHMARKS           "Build the micro benchmarks"               OFF)
 option(BUILD_PYTHON_MODULE        "Build the python module"                  ON )
 option(BUILD_CUDA_MODULE          "Build the CUDA module"                    OFF)
-option(BUILD_CACHED_CUDA_MANAGER  "Build the cached CUDA memory manager"     ON )
-option(BUILD_GUI                  "Builds new GUI"                           ON )
+option(BUILD_CACHED_CUDA_MANAGER  "Build the cached CUDA memory manager"     OFF)
+option(BUILD_GUI                  "Builds new GUI"                           OFF)
 option(BUILD_JUPYTER_EXTENSION    "Enable Jupyter support for Open3D"        OFF)
 option(WITH_OPENMP                "Use OpenMP multi-threading"               ON )
 option(WITH_IPPICV                "Use Intel Performance Primitives"         ON )
@@ -49,7 +49,7 @@ option(WITH_FAISS                 "Enable Faiss"                             ON 
 # Sensor options
 option(BUILD_LIBREALSENSE         "Build support for Intel RealSense camera" OFF)
 option(USE_SYSTEM_LIBREALSENSE    "Use system pre-installed librealsense"    OFF)
-option(BUILD_AZURE_KINECT         "Build support for Azure Kinect sensor"    OFF)
+option(BUILD_AZURE_KINECT         "Build support for Azure Kinect sensor"    ON )
 # ML library options
 option(BUILD_TENSORFLOW_OPS       "Build ops for TensorFlow"                 OFF)
 option(BUILD_PYTORCH_OPS          "Build ops for PyTorch"                    OFF)

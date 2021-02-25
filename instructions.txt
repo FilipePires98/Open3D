@@ -1,0 +1,38 @@
+
+//  Build and Installation Instructions  //
+//          (for Ubuntu 18.04)           //
+//        created by Filipe Pires        //
+//  for the project  Holographic Studio  //
+//         owned by VR360, Lda.          //
+
+// 1. Clone Repository:
+git clone --recursive https://github.com/FilipePires98/Open3D.git
+
+// 2. Install Dependencies:
+cd Open3D
+util/install_deps_ubuntu.sh
+
+// 3. Setup Python Environment - ensure that Python version is >= 3.6
+// (this example uses Anaconda, but regular Python virtualenv should work):
+conda create --name HoloStudio 
+conda activate HoloStudio 
+
+// 4. Configure:
+mkdir build
+cd build 
+cmake -DCMAKE_C_COMPILER=gcc-7 -DCMAKE_CXX_COMPILER = g++-7
+
+// 5. Build:
+make -j$(nproc)
+
+// 6. Install: 
+sudo make install 
+
+// 7. Install Python Module:
+make pip-package
+pip3 install lib/python_package/pip_package/open3d-0.12.0+2b004eb0-cp36-cp36m-linux_x86_64.whl
+
+// 8. Check Installation: 
+python -c "import open3d"
+
+// 9. Reboot (this might be necessary for changes to consolidate).

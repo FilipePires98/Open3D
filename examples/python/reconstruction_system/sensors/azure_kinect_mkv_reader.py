@@ -69,6 +69,10 @@ class ReaderWithCallback:
                 json.dump(config, f, indent=4)
 
         idx = 0
+        color_first_device_ts = -1
+        depth_first_device_ts = -1
+        color_first_system_ts = -1
+        depth_first_system_ts = -1
         while not self.reader.is_eof() and not self.flag_exit:
             if self.flag_play:
                 rgbd = self.reader.next_frame()
@@ -80,13 +84,22 @@ class ReaderWithCallback:
                     vis_geometry_added = True
 
                 if self.output is not None:
-                    color_filename = '{0}/color/{1:05d}.jpg'.format(
-                        self.output, idx)
+                    if color_first_device_ts < 0:
+                        color_first_device_ts = int(rgbd.color.device_timestamp)
+                    if depth_first_device_ts < 0:
+                        depth_first_device_ts = rgbd.depth.device_timestamp
+                    if color_first_system_ts < 0:
+                        color_first_system_ts = rgbd.color.system_timestamp
+                    if depth_first_system_ts < 0:
+                        depth_first_system_ts = rgbd.depth.system_timestamp
+
+                    # color_filename = '{0}/color/{1:05d}.jpg'.format(self.output, idx)
+                    color_filename = '{0}/color/{1:09d}.png'.format(self.output, int(rgbd.color.device_timestamp)-color_first_device_ts)
                     print('Writing to {}'.format(color_filename))
                     o3d.io.write_image(color_filename, rgbd.color)
 
-                    depth_filename = '{0}/depth/{1:05d}.png'.format(
-                        self.output, idx)
+                    # depth_filename = '{0}/depth/{1:05d}.png'.format(self.output, idx)
+                    depth_filename = '{0}/depth/{1:09d}.png'.format(self.output, int(rgbd.depth.device_timestamp)-depth_first_device_ts)
                     print('Writing to {}'.format(depth_filename))
                     o3d.io.write_image(depth_filename, rgbd.depth)
                     idx += 1

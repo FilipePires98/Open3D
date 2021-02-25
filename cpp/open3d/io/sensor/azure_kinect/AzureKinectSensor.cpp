@@ -317,6 +317,12 @@ std::shared_ptr<geometry::RGBDImage> AzureKinectSensor::DecompressCapture(
                k4a_plugin::k4a_image_get_size(k4a_depth));
     }
 
+    /* add timestamps */
+    rgbd_buffer->color_.device_timestamp_usec_ = k4a_plugin::k4a_image_get_device_timestamp_usec(k4a_color);
+    rgbd_buffer->depth_.device_timestamp_usec_ = k4a_plugin::k4a_image_get_device_timestamp_usec(k4a_depth);
+    rgbd_buffer->color_.system_timestamp_nsec_ = k4a_plugin::k4a_image_get_system_timestamp_nsec(k4a_color);
+    rgbd_buffer->depth_.system_timestamp_nsec_ = k4a_plugin::k4a_image_get_system_timestamp_nsec(k4a_depth);
+
     /* process depth */
     k4a_plugin::k4a_image_release(k4a_color);
     k4a_plugin::k4a_image_release(k4a_depth);
