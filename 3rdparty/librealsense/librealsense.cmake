@@ -4,16 +4,15 @@ ExternalProject_Add(
     ext_librealsense
     PREFIX librealsense
     GIT_REPOSITORY https://github.com/IntelRealSense/librealsense.git
-    GIT_TAG v2.40.0 # 18 Nov 2020
+    GIT_TAG v2.44.0 #  2020 Apr 1
     UPDATE_COMMAND ""
     # Patch for libusb static build failure on Linux
-    PATCH_COMMAND git -C <SOURCE_DIR> reset --hard v2.40.0
-    COMMAND ${CMAKE_COMMAND} -E copy
-    ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/librealsense/libusb-CMakeLists.txt
-    <SOURCE_DIR>/third-party/libusb/CMakeLists.txt
-    # Patch for libstdc++ regex bug
+    PATCH_COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/librealsense/libusb-CMakeLists.txt
+        <SOURCE_DIR>/third-party/libusb/CMakeLists.txt
+    # Patch for CRT mismatch in CUDA code (Windows)
     COMMAND git -C <SOURCE_DIR> apply
-    ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/librealsense/fix-2837.patch
+        ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/librealsense/fix-cudacrt.patch
     CMAKE_ARGS
         -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
@@ -28,16 +27,22 @@ ExternalProject_Add(
         -DBUILD_GRAPHICAL_EXAMPLES=OFF
         -DBUILD_PYTHON_BINDINGS=OFF
         -DBUILD_WITH_CUDA=${BUILD_CUDA_MODULE}
-        -DFORCE_RSUSB_BACKEND=$<IF:$<PLATFORM_ID:Linux>,ON,OFF>      # https://github.com/IntelRealSense/librealsense/wiki/Release-Notes#release-2400
         -DUSE_EXTERNAL_USB=ON
+        # Syncing GLIBCXX_USE_CXX11_ABI for MSVC causes problems, but directly
+        # checking CXX_COMPILER_ID is not supported.
+        $<IF:$<PLATFORM_ID:Windows>,"",-DCMAKE_CXX_FLAGS=-D_GLIBCXX_USE_CXX11_ABI=${GLIBCXX_USE_CXX11_ABI}>
         $<$<PLATFORM_ID:Darwin>:-DBUILD_WITH_OPENMP=OFF>
         $<$<PLATFORM_ID:Darwin>:-DHWM_OVER_XU=OFF>
         $<$<PLATFORM_ID:Windows>:-DBUILD_WITH_STATIC_CRT=${STATIC_WINDOWS_RUNTIME}>
+    BUILD_BYPRODUCTS
+        <INSTALL_DIR>/${Open3D_INSTALL_LIB_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}realsense2${CMAKE_STATIC_LIBRARY_SUFFIX}
+        <INSTALL_DIR>/${Open3D_INSTALL_LIB_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}realsense-file${CMAKE_STATIC_LIBRARY_SUFFIX}
+        <INSTALL_DIR>/${Open3D_INSTALL_LIB_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}fw${CMAKE_STATIC_LIBRARY_SUFFIX}
 )
 
 ExternalProject_Get_Property(ext_librealsense INSTALL_DIR)
 set(LIBREALSENSE_INCLUDE_DIR "${INSTALL_DIR}/include/") # "/" is critical.
-set(LIBREALSENSE_LIB_DIR "${INSTALL_DIR}/lib")
+set(LIBREALSENSE_LIB_DIR "${INSTALL_DIR}/${Open3D_INSTALL_LIB_DIR}")
 
 set(LIBREALSENSE_LIBRARIES realsense2 fw realsense-file usb) # The order is critical.
 if(MSVC)    # Rename debug libs to ${LIBREALSENSE_LIBRARIES}. rem (comment) is no-op
@@ -55,4 +60,5 @@ ExternalProject_Add_Step(ext_librealsense copy_libusb_to_lib_folder
     "<BINARY_DIR>/libusb_install/lib/${CMAKE_STATIC_LIBRARY_PREFIX}usb${CMAKE_STATIC_LIBRARY_SUFFIX}"
     "${LIBREALSENSE_LIB_DIR}"
     DEPENDEES install
+    BYPRODUCTS "${LIBREALSENSE_LIB_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}usb${CMAKE_STATIC_LIBRARY_SUFFIX}"
     )

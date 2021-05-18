@@ -41,6 +41,7 @@
 #pragma warning(disable : 4068 4146 4293 4305)
 #endif  // _MSC_VER
 
+#include <backend/PixelBufferDescriptor.h>
 #include <filament/Engine.h>
 #include <filament/LightManager.h>
 #include <filament/RenderableManager.h>
@@ -52,6 +53,7 @@
 #pragma warning(pop)
 #endif  // _MSC_VER
 
+#include "open3d/core/Tensor.h"
 #include "open3d/utility/Console.h"
 #include "open3d/visualization/rendering/filament/FilamentCamera.h"
 #include "open3d/visualization/rendering/filament/FilamentEntitiesMods.h"
@@ -126,6 +128,10 @@ void FilamentRenderer::SetClearColor(const Eigen::Vector4f& color) {
     renderer_->setClearOptions(co);
 }
 
+void FilamentRenderer::SetOnAfterDraw(std::function<void()> callback) {
+    on_after_draw_ = callback;
+}
+
 void FilamentRenderer::UpdateSwapChain() {
     void* native_win = swap_chain_->getNativeWindow();
     engine_.destroy(swap_chain_);
@@ -158,6 +164,12 @@ void FilamentRenderer::UpdateSwapChain() {
     swap_chain_ = engine_.createSwapChain(native_win);
 }
 
+void FilamentRenderer::UpdateBitmapSwapChain(int width, int height) {
+    engine_.destroy(swap_chain_);
+    swap_chain_ = engine_.createSwapChain(width, height,
+                                          filament::SwapChain::CONFIG_READABLE);
+}
+
 void FilamentRenderer::BeginFrame() {
     // We will complete render to buffer requests first
     if (!buffer_renderers_.empty()) {
@@ -181,12 +193,20 @@ void FilamentRenderer::BeginFrame() {
 
 void FilamentRenderer::Draw() {
     if (frame_started_) {
+        // Draw 3D scenes into textures
         for (const auto& pair : scenes_) {
             pair.second->Draw(*renderer_);
         }
 
+        // Draw the UI. This should come after the 3D scene(s), as SceneWidget
+        // will draw the textures as an image, and this way we will have the
+        // current frame's content from above.
         if (gui_scene_) {
             gui_scene_->Draw(*renderer_);
+        }
+
+        if (on_after_draw_) {
+            on_after_draw_();
         }
     }
 }
@@ -194,7 +214,51 @@ void FilamentRenderer::Draw() {
 void FilamentRenderer::EndFrame() {
     if (frame_started_) {
         renderer_->endFrame();
+        if (needs_wait_after_draw_) {
+            engine_.flushAndWait();
+            needs_wait_after_draw_ = false;
+        }
     }
+}
+
+namespace {
+
+struct UserData {
+    std::function<void(std::shared_ptr<core::Tensor>)> callback;
+    std::shared_ptr<core::Tensor> image;
+
+    UserData(std::function<void(std::shared_ptr<core::Tensor>)> cb,
+             std::shared_ptr<core::Tensor> img)
+        : callback(cb), image(img) {}
+};
+
+void ReadPixelsCallback(void*, size_t, void* user) {
+    auto* user_data = static_cast<UserData*>(user);
+    user_data->callback(user_data->image);
+    delete user_data;
+}
+
+}  // namespace
+
+void FilamentRenderer::RequestReadPixels(
+        int width,
+        int height,
+        std::function<void(std::shared_ptr<core::Tensor>)> callback) {
+    core::SizeVector shape{height, width, 3};
+    core::Dtype dtype = core::Dtype::UInt8;
+    int64_t nbytes = shape.NumElements() * dtype.ByteSize();
+
+    auto image = std::make_shared<core::Tensor>(shape, dtype);
+    auto* user_data = new UserData(callback, image);
+
+    using namespace filament;
+    using namespace backend;
+
+    PixelBufferDescriptor pd(image->GetDataPtr(), nbytes, PixelDataFormat::RGB,
+                             PixelDataType::UBYTE, ReadPixelsCallback,
+                             user_data);
+    renderer_->readPixels(0, 0, width, height, std::move(pd));
+    needs_wait_after_draw_ = true;
 }
 
 MaterialHandle FilamentRenderer::AddMaterial(
@@ -258,6 +322,19 @@ TextureHandle FilamentRenderer::AddTexture(const ResourceLoadRequest& request,
     return resource_mgr_.CreateTexture(request.path_.data(), srgb);
 }
 
+bool FilamentRenderer::UpdateTexture(
+        TextureHandle texture,
+        const std::shared_ptr<geometry::Image> image,
+        bool srgb) {
+    return resource_mgr_.UpdateTexture(texture, image, srgb);
+}
+
+bool FilamentRenderer::UpdateTexture(TextureHandle texture,
+                                     const t::geometry::Image& image,
+                                     bool srgb) {
+    return resource_mgr_.UpdateTexture(texture, image, srgb);
+}
+
 void FilamentRenderer::RemoveTexture(const TextureHandle& id) {
     resource_mgr_.Destroy(id);
 }
@@ -294,7 +371,7 @@ void FilamentRenderer::RemoveSkybox(const SkyboxHandle& id) {
 std::shared_ptr<RenderToBuffer> FilamentRenderer::CreateBufferRenderer() {
     auto renderer = std::make_shared<FilamentRenderToBuffer>(engine_);
     buffer_renderers_.insert(renderer);
-    return std::move(renderer);
+    return renderer;
 }
 
 void FilamentRenderer::ConvertToGuiScene(const SceneHandle& id) {
@@ -312,7 +389,12 @@ void FilamentRenderer::ConvertToGuiScene(const SceneHandle& id) {
 }
 
 TextureHandle FilamentRenderer::AddTexture(
-        const std::shared_ptr<geometry::Image>& image, bool srgb) {
+        const std::shared_ptr<geometry::Image> image, bool srgb) {
+    return resource_mgr_.CreateTexture(image, srgb);
+}
+
+TextureHandle FilamentRenderer::AddTexture(const t::geometry::Image& image,
+                                           bool srgb) {
     return resource_mgr_.CreateTexture(image, srgb);
 }
 

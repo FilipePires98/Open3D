@@ -59,6 +59,11 @@ void pybind_console(py::module& m) {
           "Get global verbosity level of Open3D");
     docstring::FunctionDocInject(m, "get_verbosity_level");
 
+    m.def("reset_print_function", []() {
+        utility::LogInfo("Resetting default logger to print to terminal.");
+        utility::Logger::GetInstance().ResetPrintFunction();
+    });
+
     py::class_<VerbosityContextManager>(m, "VerbosityContextManager",
                                         "A context manager to "
                                         "temporally change the "
@@ -68,13 +73,13 @@ void pybind_console(py::module& m) {
                  "level"_a)
             .def(
                     "__enter__",
-                    [&](VerbosityContextManager& cm) { cm.enter(); },
+                    [&](VerbosityContextManager& cm) { cm.Enter(); },
                     "Enter the context manager")
             .def(
                     "__exit__",
                     [&](VerbosityContextManager& cm, pybind11::object exc_type,
                         pybind11::object exc_value,
-                        pybind11::object traceback) { cm.exit(); },
+                        pybind11::object traceback) { cm.Exit(); },
                     "Exit the context manager");
 }
 

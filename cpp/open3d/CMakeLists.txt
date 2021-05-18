@@ -4,6 +4,9 @@
 # In comparison, open3d_set_global_properties() sets properties for the Open3D
 # lib, and targets that links to the Open3D lib, e.g pybind, unit tests, etc.
 function(open3d_set_open3d_lib_properties target)
+    if(NOT BUILD_SHARED_LIBS)
+        target_compile_definitions(${target} PUBLIC OPEN3D_STATIC)
+    endif()
     target_compile_definitions(${target} PRIVATE OPEN3D_ENABLE_DLL_EXPORTS)
 endfunction()
 
@@ -28,6 +31,10 @@ add_subdirectory(visualization)
 if (BUILD_GUI)
     add_subdirectory(visualization/gui)
     set(GUI_OBJECTS "$<TARGET_OBJECTS:GUI>")
+endif()
+if (BUILD_WEBRTC)
+    add_subdirectory(visualization/webrtc_server)
+    set(WEBRTC_OBJECTS "$<TARGET_OBJECTS:webrtc_server>")
 endif()
 
 # Source group for Visual Studio
@@ -59,6 +66,7 @@ add_library(${CMAKE_PROJECT_NAME}
     $<TARGET_OBJECTS:utility>
     $<TARGET_OBJECTS:visualization>
     ${GUI_OBJECTS}
+    ${WEBRTC_OBJECTS}
 )
 open3d_show_and_abort_on_warning(${PROJECT_NAME})
 open3d_set_global_properties(${PROJECT_NAME})

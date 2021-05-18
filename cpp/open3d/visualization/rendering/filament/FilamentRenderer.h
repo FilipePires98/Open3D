@@ -70,10 +70,17 @@ public:
 
     virtual void SetClearColor(const Eigen::Vector4f& color) override;
     void UpdateSwapChain() override;
+    void UpdateBitmapSwapChain(int width, int height) override;
 
     void BeginFrame() override;
     void Draw() override;
+    void RequestReadPixels(int width,
+                           int height,
+                           std::function<void(std::shared_ptr<core::Tensor>)>
+                                   callback) override;
     void EndFrame() override;
+
+    void SetOnAfterDraw(std::function<void()> callback) override;
 
     MaterialHandle AddMaterial(const ResourceLoadRequest& request) override;
     MaterialInstanceHandle AddMaterialInstance(
@@ -84,8 +91,16 @@ public:
 
     TextureHandle AddTexture(const ResourceLoadRequest& request,
                              bool srgb = false) override;
-    TextureHandle AddTexture(const std::shared_ptr<geometry::Image>& image,
+    TextureHandle AddTexture(const std::shared_ptr<geometry::Image> image,
                              bool srgb = false) override;
+    TextureHandle AddTexture(const t::geometry::Image& image,
+                             bool srgb = false) override;
+    bool UpdateTexture(TextureHandle texture,
+                       const std::shared_ptr<geometry::Image> image,
+                       bool srgb) override;
+    bool UpdateTexture(TextureHandle texture,
+                       const t::geometry::Image& image,
+                       bool srgb) override;
     void RemoveTexture(const TextureHandle& id) override;
 
     IndirectLightHandle AddIndirectLight(
@@ -124,6 +139,8 @@ private:
             buffer_renderers_;
 
     bool frame_started_ = false;
+    std::function<void()> on_after_draw_;
+    bool needs_wait_after_draw_ = false;
 };
 
 }  // namespace rendering

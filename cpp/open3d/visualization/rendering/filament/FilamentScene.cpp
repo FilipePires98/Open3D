@@ -276,8 +276,6 @@ void FilamentScene::SetRenderOnce(const ViewHandle& view_id) {
     auto found = views_.find(view_id);
     if (found != views_.end()) {
         found->second.is_active = true;
-        // NOTE: This value should match the value of render_count_ in
-        // FilamentRenderer::EnableCaching
         found->second.render_count = 1;
     }
 }
@@ -320,10 +318,18 @@ bool FilamentScene::AddGeometry(const std::string& object_name,
         return false;
     }
 
+    // Basic sanity checks
+    if (geometry.IsEmpty()) {
+        utility::LogDebug(
+                "Geometry for object {} is empty. Not adding geometry to scene",
+                object_name);
+        return false;
+    }
+
     auto tris = dynamic_cast<const geometry::TriangleMesh*>(&geometry);
     if (tris && tris->vertex_normals_.empty() &&
         tris->triangle_normals_.empty() &&
-        (material.shader == "defaultUnlit" ||
+        (material.shader == "defaultLit" ||
          material.shader == "defaultLitTransparency")) {
         utility::LogWarning(
                 "Using a shader with lighting but geometry has no normals.");
@@ -554,12 +560,6 @@ bool FilamentScene::HasGeometry(const std::string& object_name) const {
     return (geom_entry != geometries_.end());
 }
 
-static void deallocate_vertex_buffer(void* buffer,
-                                     size_t size,
-                                     void* user_ptr) {
-    free(buffer);
-}
-
 void FilamentScene::UpdateGeometry(const std::string& object_name,
                                    const t::geometry::PointCloud& point_cloud,
                                    uint32_t update_flags) {
@@ -620,9 +620,9 @@ void FilamentScene::UpdateGeometry(const std::string& object_name,
                                        .build();
             orientation->getQuats(float4v_tangents, n_vertices);
             filament::VertexBuffer::BufferDescriptor normals_descriptor(
-                    float4v_tangents, normal_array_size,
-                    deallocate_vertex_buffer);
+                    float4v_tangents, normal_array_size, DeallocateBuffer);
             vbuf->setBufferAt(engine_, 2, std::move(normals_descriptor));
+            delete orientation;
         }
 
         if (update_flags & kUpdateUv0Flag) {
@@ -876,9 +876,12 @@ void FilamentScene::UpdateDefaultLitSSR(GeometryMaterialInstance& geom_mi) {
 }
 
 void FilamentScene::UpdateDefaultUnlit(GeometryMaterialInstance& geom_mi) {
+    float srgb = (geom_mi.properties.sRGB_vertex_color ? 1.f : 0.f);
+
     renderer_.ModifyMaterial(geom_mi.mat_instance)
             .SetColor("baseColor", geom_mi.properties.base_color, true)
             .SetParameter("pointSize", geom_mi.properties.point_size)
+            .SetParameter("srgbColor", srgb)
             .SetTexture("albedo", geom_mi.maps.albedo_map,
                         rendering::TextureSamplerParameters::Pretty())
             .Finish();
@@ -933,6 +936,7 @@ void FilamentScene::UpdateBackgroundShader(GeometryMaterialInstance& geom_mi) {
     renderer_.ModifyMaterial(geom_mi.mat_instance)
             .SetColor("baseColor", geom_mi.properties.base_color, true)
             .SetParameter("aspectRatio", geom_mi.properties.aspect_ratio)
+            .SetParameter("yOrigin", 1.0f)
             .SetTexture("albedo", geom_mi.maps.albedo_map,
                         rendering::TextureSamplerParameters::LinearClamp())
             .Finish();
@@ -1119,7 +1123,7 @@ void FilamentScene::UpdateMaterialProperties(RenderableGeometry& geom) {
         UpdateLineShader(geom.mat);
     } else if (props.shader == "unlitPolygonOffset") {
         UpdateUnlitPolygonOffsetShader(geom.mat);
-    } else if (props.shader != "") {
+    } else {
         utility::LogWarning("'{}' is not a valid shader", props.shader);
     }
 }
@@ -1654,18 +1658,48 @@ void FilamentScene::SetBackground(
         const std::shared_ptr<geometry::Image> image) {
     // Make sure background geometry exists
     CreateBackgroundGeometry();
+
+    std::shared_ptr<geometry::Image> new_image;
+    if (image && image->width_ != 0 && image->height_ != 0) {
+        new_image = image;
+    }
+
     Material m;
     m.shader = "unlitBackground";
     m.base_color = color;
-    if (image) {
-        m.albedo_img = image;
-        m.aspect_ratio = static_cast<float>(image->width_) /
-                         static_cast<float>(image->height_);
+    if (new_image) {
+        m.albedo_img = new_image;
+        m.aspect_ratio = static_cast<float>(new_image->width_) /
+                         static_cast<float>(new_image->height_);
+        // See if we can replace the image data instead of re-creating the
+        // whole texture. We need to make sure that both old and new images
+        // actually exist, first. (The texture may exist, so we can't query it)
+        if (new_image && background_image_) {
+            auto geom_it = geometries_.find(kBackgroundName);
+            if (geom_it != geometries_.end()) {
+                // Try updating the texture. If the sizes are incorrect, this
+                // will fail.
+                if (resource_mgr_.UpdateTexture(
+                            geom_it->second.mat.maps.albedo_map, new_image,
+                            false /*not sRGB*/)) {
+                    return;
+                }
+            }
+        }
     } else {
         m.albedo_img = nullptr;
         m.aspect_ratio = 0.0;
     }
+    auto geom_it = geometries_.find(kBackgroundName);
+    if (geom_it != geometries_.end()) {
+        if (geom_it->second.mat.maps.albedo_map) {
+            resource_mgr_.Destroy(geom_it->second.mat.maps.albedo_map);
+            geom_it->second.mat.maps.albedo_map =
+                    FilamentResourceManager::kDefaultTexture;
+        }
+    }
     OverrideMaterial(kBackgroundName, m);
+    background_image_ = new_image;
 }
 
 void FilamentScene::SetBackground(TextureHandle image) {
@@ -1683,6 +1717,7 @@ void FilamentScene::SetBackground(TextureHandle image) {
 
     renderer_.ModifyMaterial(geom_mi.mat_instance)
             .SetParameter("aspectRatio", aspect)
+            .SetParameter("yOrigin", 0.0f)
             .SetTexture("albedo", image,
                         rendering::TextureSamplerParameters::LinearClamp())
             .Finish();
@@ -1756,6 +1791,12 @@ void FilamentScene::RenderToImage(
         std::function<void(std::shared_ptr<geometry::Image>)> callback) {
     auto view = views_.begin()->second.view.get();
     renderer_.RenderToImage(view, this, callback);
+}
+
+void FilamentScene::RenderToDepthImage(
+        std::function<void(std::shared_ptr<geometry::Image>)> callback) {
+    auto view = views_.begin()->second.view.get();
+    renderer_.RenderToDepthImage(view, this, callback);
 }
 
 std::vector<FilamentScene::RenderableGeometry*> FilamentScene::GetGeometry(

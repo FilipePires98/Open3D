@@ -46,21 +46,10 @@ INSTANTIATE_TEST_SUITE_P(
         RegistrationPermuteDevicePairs,
         testing::ValuesIn(RegistrationPermuteDevicePairs::TestCases()));
 
-class RegistrationPermuteDevicesWithFaiss : public PermuteDevicesWithFaiss {};
-INSTANTIATE_TEST_SUITE_P(
-        Registration,
-        RegistrationPermuteDevicesWithFaiss,
-        testing::ValuesIn(PermuteDevicesWithFaiss::TestCases()));
-
 TEST_P(RegistrationPermuteDevices, ICPConvergenceCriteriaConstructor) {
-    core::Device device = GetParam();
-    core::Dtype dtype = core::Dtype::Float32;
-
-    // Initial transformation input for tensor implementation.
-    core::Tensor init_trans_t = core::Tensor::Eye(4, dtype, device);
-
+    // Constructor.
     t::pipelines::registration::ICPConvergenceCriteria convergence_criteria;
-
+    // Default values.
     EXPECT_EQ(convergence_criteria.max_iteration_, 30);
     EXPECT_DOUBLE_EQ(convergence_criteria.relative_fitness_, 1e-6);
     EXPECT_DOUBLE_EQ(convergence_criteria.relative_rmse_, 1e-6);
@@ -68,7 +57,7 @@ TEST_P(RegistrationPermuteDevices, ICPConvergenceCriteriaConstructor) {
 
 TEST_P(RegistrationPermuteDevices, RegistrationResultConstructor) {
     core::Device device = GetParam();
-    core::Dtype dtype = core::Dtype::Float32;
+    core::Dtype dtype = core::Dtype::Float64;
 
     // Initial transformation input for tensor implementation.
     core::Tensor init_trans_t = core::Tensor::Eye(4, dtype, device);
@@ -77,11 +66,10 @@ TEST_P(RegistrationPermuteDevices, RegistrationResultConstructor) {
 
     EXPECT_DOUBLE_EQ(reg_result.inlier_rmse_, 0.0);
     EXPECT_DOUBLE_EQ(reg_result.fitness_, 0.0);
-    EXPECT_EQ(reg_result.transformation_.ToFlatVector<float>(),
-              init_trans_t.ToFlatVector<float>());
+    EXPECT_TRUE(reg_result.transformation_.AllClose(init_trans_t));
 }
 
-TEST_P(RegistrationPermuteDevicesWithFaiss, EvaluateRegistration) {
+TEST_P(RegistrationPermuteDevices, EvaluateRegistration) {
     core::Device device = GetParam();
     core::Dtype dtype = core::Dtype::Float32;
 
@@ -122,7 +110,8 @@ TEST_P(RegistrationPermuteDevicesWithFaiss, EvaluateRegistration) {
             target_device.ToLegacyPointCloud();
 
     // Initial transformation input for tensor implementation.
-    core::Tensor init_trans_t = core::Tensor::Eye(4, dtype, device);
+    core::Tensor init_trans_t =
+            core::Tensor::Eye(4, core::Dtype::Float64, device);
 
     // Initial transformation input for legacy implementation.
     Eigen::Matrix4d init_trans_l = Eigen::Matrix4d::Identity();
@@ -146,7 +135,7 @@ TEST_P(RegistrationPermuteDevicesWithFaiss, EvaluateRegistration) {
     EXPECT_NEAR(evaluation_t.inlier_rmse_, evaluation_l.inlier_rmse_, 0.0005);
 }
 
-TEST_P(RegistrationPermuteDevicesWithFaiss, RegistrationICPPointToPoint) {
+TEST_P(RegistrationPermuteDevices, RegistrationICPPointToPoint) {
     core::Device device = GetParam();
     core::Dtype dtype = core::Dtype::Float32;
 
@@ -178,7 +167,8 @@ TEST_P(RegistrationPermuteDevicesWithFaiss, RegistrationICPPointToPoint) {
             target_device.ToLegacyPointCloud();
 
     // Initial transformation input for tensor implementation.
-    core::Tensor init_trans_t = core::Tensor::Eye(4, dtype, device);
+    core::Tensor init_trans_t =
+            core::Tensor::Eye(4, core::Dtype::Float64, device);
 
     // Initial transformation input for legacy implementation.
     Eigen::Matrix4d init_trans_l = Eigen::Matrix4d::Identity();
@@ -212,7 +202,7 @@ TEST_P(RegistrationPermuteDevicesWithFaiss, RegistrationICPPointToPoint) {
     EXPECT_NEAR(reg_p2p_t.inlier_rmse_, reg_p2p_l.inlier_rmse_, 0.0005);
 }
 
-TEST_P(RegistrationPermuteDevicesWithFaiss, RegistrationICPPointToPlane) {
+TEST_P(RegistrationPermuteDevices, RegistrationICPPointToPlane) {
     core::Device device = GetParam();
     core::Dtype dtype = core::Dtype::Float32;
 
@@ -253,7 +243,8 @@ TEST_P(RegistrationPermuteDevicesWithFaiss, RegistrationICPPointToPlane) {
             target_device.ToLegacyPointCloud();
 
     // Initial transformation input for tensor implementation.
-    core::Tensor init_trans_t = core::Tensor::Eye(4, dtype, device);
+    core::Tensor init_trans_t =
+            core::Tensor::Eye(4, core::Dtype::Float64, device);
 
     // Initial transformation input for legacy implementation.
     Eigen::Matrix4d init_trans_l = Eigen::Matrix4d::Identity();

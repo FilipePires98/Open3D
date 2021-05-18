@@ -49,6 +49,10 @@ set(TF_OPS_SOURCES
     "../contrib/GridSubsampling.cpp"
     "../contrib/neighbors.cpp"
     "../contrib/Nms.cpp"
+    "pointnet/SamplingOps.cpp"
+    "pointnet/BallQueryOps.cpp"
+    "pointnet/InterpolateOps.cpp"
+    "pointnet/RoiPoolOps.cpp"
 )
 
 set(TF_OPS_CUDA_SOURCES
@@ -64,6 +68,13 @@ set(TF_OPS_CUDA_SOURCES
     "misc/NmsOpKernel.cu"
     "../impl/continuous_conv/ContinuousConvCUDAKernels.cu"
     "../contrib/Nms.cu"
+    "../contrib/BallQuery.cu"
+    "../contrib/InterpolatePoints.cu"
+    "../contrib/RoiPoolKernel.cu"
+    "pointnet/SamplingOpKernel.cu"
+    "pointnet/BallQueryOpKernel.cu"
+    "pointnet/InterpolateOpKernel.cu"
+    "pointnet/RoiPoolOpKernel.cu"
 )
 
 if(BUILD_CUDA_MODULE)
